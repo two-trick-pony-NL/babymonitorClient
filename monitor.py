@@ -1,7 +1,8 @@
 import requests
-import RPi.GPIO as GPIO
 import requests
 import time
+from gpiozero import MotionSensor
+from take_measurement import measure
 
 url = "https://iom7vetorqgo7rg77bo5o2mmee0vcpgy.lambda-url.eu-central-1.on.aws"
 endpoint = url +"/create-measurement"
@@ -20,29 +21,26 @@ def create_measurement(temperature, humidity, movementDetected, cryDetected):
     }
     return body
 
-def detect_temperature():
-    return 30
-
-def detect_humidity():
-    return 50
-
-def detect_movement():
-    return True
-
 def detect_cry():
     return False
 
+i = 0
 while True:
-    try: 
-        print("New measurement")
-        newReading = [detect_temperature(), detect_humidity(), detect_movement(), detect_cry()]
-        if newReading == lastMeasurement:
-            print("Data stayed the same no update")
-        else:
-            print("Detected change:")
-            lastMeasurement = newReading
-            x = requests.put(endpoint, json = create_measurement(detect_temperature(), detect_humidity(),detect_movement(), detect_cry()))
-            print(x.text)
-    except:
-        print("Something went wrong, trying again in 10 seconds")        
-    time.sleep(10)
+    humidity, temperature, movement = measure()
+    print("New measurement")
+    newMeasurement = [humidity, temperature, movement]
+    if newMeasurement == lastMeasurement:
+        print("Same values")
+        time.sleep(5)
+        i = i + 1 
+        print(i % 10)
+        if i % 10 == 0: #updating the backend every 10th try
+            x = requests.put(endpoint, json = create_measurement(temperature, humidity, movement, True))
+    else:
+        print("Values changed")
+        print('from : ', lastMeasurement)
+        print('to   :', newMeasurement)
+        lastMeasurement = newMeasurement
+        x = requests.put(endpoint, json = create_measurement(temperature, humidity, movement, True))
+        #print(x.text)
+        time.sleep(5)
